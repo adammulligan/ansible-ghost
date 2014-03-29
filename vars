@@ -1,0 +1,3 @@
+ghost_port: 80
+host: blog.cyanoryx.com
+www_host: www.blog.cyanoryx.com

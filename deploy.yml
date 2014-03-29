@@ -1,0 +1,63 @@
+---
+
+- name: Deploy to server
+  hosts: servers
+  user: adam
+  vars_files:
+    - vars
+
+  tasks:
+    - name: Add python-software-properties
+      apt: pkg=software-properties-common state=present
+      sudo: yes
+
+    - name: Add ghost user
+      user: name=ghost state=present
+      sudo: yes
+
+    - name: Create /var/www
+      file: dest=/var/www/{{host}} state=directory owner=ghost group=ghost mode=0777
+      sudo: yes
+
+    - name: Copy ghost source
+      get_url: url="https://ghost.org/zip/ghost-latest.zip" dest=/tmp
+
+    - name: Extract ghost
+      command: unzip -o /tmp/ghost-latest.zip -d /var/www/{{host}}
+
+    - name: npm Install
+      command: npm install chdir=/var/www/{{host}}
+      sudo: yes
+
+    - name: Create data directory
+      file: path=/var/opt/ghost/data state=directory owner=ghost group=ghost mode=0777
+      sudo: yes
+
+    - name: Delete existing ghost db
+      file: path=/var/www/{{host}}/content/data/ghost.db state=absent
+
+    - name: Symlink data
+      file: src=/var/opt/ghost/data/ghost.db dest=/var/www/{{host}}/content/data/ghost.db state=link
+
+    - name: Copy ghost configuration
+      template: src=templates/config.ghost.j2 dest=/var/www/{{host}}/config.js
+
+    - name: Copy upstart file
+      template: src=templates/ghost_init.j2 dest=/etc/init.d/ghost mode=0755
+      sudo: yes
+
+    - name: Install nginx config
+      template: src=templates/nginx.j2 dest=/etc/nginx/sites-available/blog
+      sudo: yes
+
+    - name: Enable nginx config
+      file: src=/etc/nginx/sites-available/blog dest=/etc/nginx/sites-enabled/blog state=link
+      sudo: yes
+
+    - name: Restart nginx
+      service: name=nginx state=restarted
+      sudo: yes
+
+    - name: Start ghost blog
+      service: name=ghost state=started
+      sudo: yes
